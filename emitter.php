@@ -131,4 +131,15 @@ class emitter
     }
 
 
+    public function subscribe($topics, $qos = 0)
+    {
+        return $this->emitter->subscribe($topics, $qos);
+    }
+
+    public function proc($loop = true)
+    {
+        $this->emitter->proc($loop);
+    }
+
+
 }
