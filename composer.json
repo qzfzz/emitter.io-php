@@ -10,11 +10,15 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "php": ">=5.3"
+        "php": ">=5.3",
+        "qzfzz/phalcon_common_libs":"dev-master"
     },
     "autoload": {
         "psr-4": {
             "emitter\\": "./"
         }
-    }
+    },
+    "repositories": [
+        {"type":"vcs", "url":"https://gitee.com/qzfzz/phalcon_common_libs.git"}
+    ]
 }
