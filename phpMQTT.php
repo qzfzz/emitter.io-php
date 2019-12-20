@@ -323,6 +323,7 @@ class phpMQTT
         $i = 0;
         $buffer = "";
 
+
         $buffer .= $this->strwritestring($topic, $i);
 
         //$buffer .= $this->strwritestring($content,$i);
@@ -341,17 +342,30 @@ class phpMQTT
 
         $head = " ";
         $cmd = 0x30;
+
         if($qos)
             $cmd += $qos << 1;
+
         if($retain)
             $cmd += 1;
 
         $head{0} = chr($cmd);
         $head .= $this->setmsglength($i);
 
-        fwrite($this->socket, $head, strlen($head));
-        fwrite($this->socket, $buffer, $i);
+        $ret = fwrite($this->socket, $head, strlen($head));
+        if( 0 != $ret )
+        {
+            $ret = fwrite($this->socket, $buffer, $i);
 
+            if( 0 == $ret )
+            {
+                throw new \Exception("lose connection or other exception");
+            }
+        }
+        else
+        {
+            throw new \Exception("lose connection or other exception");
+        }
     }
 
     /* message: processes a recieved topic */

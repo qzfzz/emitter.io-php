@@ -8,13 +8,12 @@
 
 namespace emitter;
 
-
 use emitter\phpMQTT;
+use qhelpers\HttpRequest;
+use qhelpers\StringUtils;
 
 class emitter
 {
-
-
     protected $emitter;
     protected $prefix = '';
 
@@ -24,17 +23,12 @@ class emitter
      */
     public function __construct(array $config)
     {
-
         $this->_config = $config;
-
 
         $server = $config['server'];
         $port = $config['port'];
         $uniqueId = isset($config['uniqueId']) ? $config['uniqueId'] : sha1(microtime() . $server . $port);
         $this->prefix = isset($config['prefix']) ? $this->parsePrefix($config['prefix']) : '';
-
-
-
 
         $username = '';
         $password = '';
@@ -42,6 +36,7 @@ class emitter
         if (! $this->emitter->connect(true, NULL, $username, $password)) {
             return false;
         }
+
         return true;
     }
 
@@ -57,6 +52,36 @@ class emitter
         }
 
         return $prefix;
+    }
+
+    /**
+     * @param $private_key
+     * @param $channel
+     * @param $url
+     * @param $ttl
+     * @return array
+     */
+    private static function prepareDataToPost($private_key, $channel, $url, $ttl): array
+    {
+        assert(StringUtils::endsWith($channel, '/#/'), 'channel name should ends with /#/');
+
+        $data_to_post = ['key' => $private_key, 'channel' => $channel];
+
+        if($ttl) {
+            $data_to_post['ttl'] = $ttl . '';
+        }
+
+        $fields = ['sub', 'pub', 'store', 'load', 'presence'];
+
+        foreach($fields as $field => $defaultValue) {
+            if(${$field} || ${$field} == strtolower('on')) {
+                $data_to_post[$field] = 'on';
+            }
+        }
+
+        $hr = HttpRequest::getInstance();
+        $ret = $hr->post($url, $data_to_post);
+        return $ret;
     }
 
 
@@ -102,6 +127,10 @@ class emitter
             (substr($haystack, -$length) === $needle);
     }
 
+    public function reconnect()
+    {
+        $this->emitter->connect();
+    }
 
     public function disconnect()
     {
@@ -123,10 +152,10 @@ class emitter
         $channel.= '?ttl=' . $ttl;
 
 
-
         if (is_array($message) || is_object($message)) {
             $message = json_encode($message);
         }
+
         $this->emitter->publish($key . $channel, $message, 0);
     }
 
@@ -136,10 +165,110 @@ class emitter
         return $this->emitter->subscribe($topics, $qos);
     }
 
+    /**
+     * do process
+     * @param bool $loop
+     */
     public function proc($loop = true)
     {
         $this->emitter->proc($loop);
     }
 
+    /**
+     * @param $key
+     * @param $channel
+     * @param string $url
+     * @param null $ttl
+     * @param bool $sub
+     * @param bool $pub
+     * @param bool $store
+     * @param bool $load
+     * @param bool $presence
+     * @return string | bool
+     */
+    public static function getChannelKeyFromJson($private_key,
+                                                 $channel,
+                                                 $url = 'http://127.0.0.1:8080/keygen_json',
+                                                 $ttl = null,
+                                                 $sub = true,
+                                                 $pub = true,
+                                                 $store = true,
+                                                 $load = true,
+                                                 $presence = true )
+    {
+        $ret = self::prepareDataToPost($private_key,
+            $channel,
+            $url,
+            $ttl,
+            $sub,
+            $pub,
+            $store,
+            $load,
+            $presence);
+
+        if( $ret['code'] == 0 )
+        {
+            $data = $ret['data'];
+
+            $ret = json_decode( $data, true );
+
+            if( $ret['code']  == 0 )
+            {
+                return $ret['message'];
+            }
+        }
+
+        return false;
+    }
+
+
+    /**
+     * @param $key
+     * @param $channel
+     * @param string $url
+     * @param null $ttl
+     * @param bool $sub
+     * @param bool $pub
+     * @param bool $store
+     * @param bool $load
+     * @param bool $presence
+     * @return string | bool
+     */
+    public static function getChannelKeyFromHtml( $private_key,
+                                                  $channel,
+                                                  $url = 'http://127.0.0.1:8080/keygen',
+                                                  $ttl = null,
+                                                  $sub = true,
+                                                  $pub = true,
+                                                  $store = true,
+                                                  $load = true,
+                                                  $presence = true)
+    {
+        $ret = self::prepareDataToPost($private_key,
+            $channel,
+            $url,
+            $ttl,
+            $sub,
+            $pub,
+            $store,
+            $load,
+            $presence);
+
+        if( $ret['code'] == 0 )
+        {
+            $html = $ret['data'];
+
+            $pattern = "/key\s*:\s*(.*)<\/pre>/";
+            if(preg_match($pattern, $html, $matches))
+            {
+                return $matches[1];
+            }
+
+        }
+        else
+        {
+            return false;
+        }
+    }
 
 }
