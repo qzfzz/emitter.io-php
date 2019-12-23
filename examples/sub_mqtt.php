@@ -2,7 +2,7 @@
 
 include "../vendor/autoload.php";
 
-$emitter = new \emitter\emitter(array(
+$emitter = new \emitter\Emitter(array(
     'server' => '127.0.0.1',
     'port'   => '8080',
 ));
@@ -10,6 +10,7 @@ $emitter = new \emitter\emitter(array(
 $emitterChannel = 'device/paver/SN100';
 $emitterKey = 'vsqk2rExvRg8qra4LoQLcbx1enNUapz8';
 
+TryAgain:
 $topics = [ $emitterChannel =>
     [
         'key' => $emitterKey,
@@ -22,13 +23,25 @@ $topics = [ $emitterChannel =>
     echo 'received message: ', $topic, ' ', $message, PHP_EOL;
 }]];
 
-$qos = 0;
-$emitter->subscribe($topics, $qos);
+$emitter->subscribe( $topics );
 
-while(true){
-    $emitter->proc();
-}
+\Workerman\Lib\Timer::add(0.01, function()use(&$emitter){
+    try
+    {
+        RETRY:
+        $emitter->proc();
+    }
+    catch(\Exception|\Error $e)
+    {
+        echo $e->getMessage(), PHP_EOL;
+        echo $e->getTraceAsString(), PHP_EOL;
+
+        $emitter->reconnect(true);
 
 
+        goto RETRY;
+    }
 
-echo __LINE__, PHP_EOL;
+});
+
+\Workerman\Worker::runAll();

@@ -80,29 +80,45 @@ class phpMQTT
         inputs: $clean: should the client send a clean session flag */
     public function connect($clean = true, $will = NULL, $username = NULL, $password = NULL)
     {
-
         if($will)
+        {
             $this->will = $will;
+        }
+
         if($username)
+        {
             $this->username = $username;
+        }
+
         if($password)
+        {
             $this->password = $password;
+        }
 
 
-        if($this->cafile) {
+
+        if($this->cafile)
+        {
             $socketContext = stream_context_create(["ssl" => [
                 "verify_peer_name" => true,
                 "cafile" => $this->cafile
             ]]);
             $this->socket = stream_socket_client("tls://" . $this->address . ":" . $this->port, $errno, $errstr, 60, STREAM_CLIENT_CONNECT, $socketContext);
-        } else {
+        }
+        else
+        {
             $this->socket = stream_socket_client("tcp://" . $this->address . ":" . $this->port, $errno, $errstr, 60, STREAM_CLIENT_CONNECT);
         }
 
-        if(!$this->socket) {
+        if(!$this->socket)
+        {
             if($this->debug)
+            {
                 error_log("stream_socket_create() $errno, $errstr \n");
-            return false;
+            }
+
+            throw new \Exception("stream_socket_create fail error no is $errno");
+//            return false;
         }
 
         stream_set_timeout($this->socket, 5);
@@ -199,12 +215,18 @@ class phpMQTT
 
         //	print_r(socket_get_status($this->socket));
 
+        if( $this->socket == false )
+        {
+            throw new LoseConnException('lost conn exception');
+        }
+
         $string = "";
         $togo = $int;
 
         if($nb) {
             return fread($this->socket, $togo);
         }
+
 
         while (!feof($this->socket) && $togo > 0) {
             $fread = fread($this->socket, $togo);
@@ -233,14 +255,28 @@ class phpMQTT
         $buffer .= chr($id % 256);
         $i++;
 
+        if( $this->_subscribe_cnt >= 2 )
+        {
+            echo 'subscribe cnt: ', PHP_EOL;
+        }
+
         foreach($topics as $channel => &$topic) {
             assert(is_callable($topic['function']), 'function must be callable');
+
+            if( $this->_subscribe_cnt > 1 )
+            {
+                $key = $this->assembleKey($topic, true);
+
+                unset($this->topics[$key]);
+
+            }
 
             $key = $this->assembleKey($topic, !($this->_subscribe_cnt > 1));
 
             $buffer .= $this->strwritestring($key, $i);
             $buffer .= chr($topic["qos"]);
             $i++;
+
             $this->topics[$key] = $topic;
 
             $this->topics[$key]['cnt'] = 0;
@@ -328,7 +364,8 @@ class phpMQTT
 
         //$buffer .= $this->strwritestring($content,$i);
 
-        if($qos) {
+        if($qos)
+        {
             $id = $this->msgid++;
             $buffer .= chr($id >> 8);
             $i++;
@@ -344,10 +381,16 @@ class phpMQTT
         $cmd = 0x30;
 
         if($qos)
+        {
             $cmd += $qos << 1;
+        }
+
 
         if($retain)
+        {
             $cmd += 1;
+        }
+
 
         $head{0} = chr($cmd);
         $head .= $this->setmsglength($i);
@@ -361,11 +404,16 @@ class phpMQTT
             {
                 throw new \Exception("lose connection or other exception");
             }
+
+            return $ret;
         }
         else
         {
             throw new \Exception("lose connection or other exception");
         }
+
+        return false;
+
     }
 
     /* message: processes a recieved topic */
@@ -375,12 +423,15 @@ class phpMQTT
         $topic = substr($msg, 2, $tlen);
         $msg = substr($msg, ($tlen + 2));
         $found = 0;
-        foreach($this->topics as $key => $top) {
 
+        foreach($this->topics as $key => $top)
+        {
             $replaced_topic = '/' . str_replace("#", ".*", str_replace("+", "[^\/]*", str_replace("/", "\/", str_replace("$", '\$', $topic)))) . '/';
 
-            if(preg_match($replaced_topic, $key)) {
-                if(is_callable($top['function'])) {
+            if(preg_match($replaced_topic, $key))
+            {
+                if(is_callable($top['function']))
+                {
                     call_user_func($top['function'], $topic, $msg);
                     $found = 1;
                 }
@@ -389,7 +440,10 @@ class phpMQTT
         }
 
         if($this->debug && !$found)
+        {
             echo "msg recieved but no match in subscriptions\n";
+        }
+
     }
 
     /* proc: the processing loop for an "allways on" client
@@ -397,29 +451,45 @@ class phpMQTT
     public function proc($loop = true)
     {
         //$byte = fgetc($this->socket);
-        if(feof($this->socket)) {
+        if(feof($this->socket))
+        {
             if($this->debug)
+            {
                 echo "eof receive going to reconnect for good measure\n";
+            }
+
             fclose($this->socket);
             $this->connect_auto(false);
+
             if(count($this->topics))
+            {
                 $this->subscribe($this->topics);
+            }
+
         }
 
         $byte = $this->read(1, true);
 
-        if(!strlen($byte)) {
-            if($loop) {
+        if(!strlen($byte))
+        {
+            if($loop)
+            {
                 usleep(10000);
             }
 
-        } else {
+        }
+        else
+        {
             $cmd = (int)(ord($byte) / 16);
             if($this->debug)
+            {
                 echo "Recevid: $cmd\n";
+            }
+
 
             $multiplier = 1;
             $value = 0;
+
             do {
                 $digit = ord($this->read(1));
                 $value += ($digit & 127) * $multiplier;
@@ -427,13 +497,21 @@ class phpMQTT
             } while (($digit & 128) != 0);
 
             if($this->debug)
+            {
                 echo "Fetching: $value\n";
+            }
+
 
             if($value)
+            {
                 $string = $this->read($value);
+            }
 
-            if($cmd) {
-                switch ($cmd) {
+
+            if($cmd)
+            {
+                switch ($cmd)
+                {
                     case 3:
                         $this->message($string);
                         break;
@@ -443,20 +521,33 @@ class phpMQTT
             }
         }
 
-        if($this->timesinceping < (time() - $this->keepalive)) {
+        if($this->timesinceping < (time() - $this->keepalive))
+        {
             if($this->debug)
+            {
                 echo "not found something so ping\n";
+            }
+
             $this->ping();
         }
 
 
-        if($this->timesinceping < (time() - ($this->keepalive * 2))) {
+        if($this->timesinceping < (time() - ($this->keepalive * 2)))
+        {
             if($this->debug)
+            {
                 echo "not seen a package in a while, disconnecting\n";
+            }
+
             fclose($this->socket);
+
             $this->connect_auto(false);
+
             if(count($this->topics))
+            {
                 $this->subscribe($this->topics);
+            }
+
         }
 
 

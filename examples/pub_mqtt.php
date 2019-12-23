@@ -2,7 +2,7 @@
 
 include "../vendor/autoload.php";
 
-$emitter = new \emitter\emitter(array(
+$emitter = new \emitter\Emitter(array(
     'server' => '127.0.0.1',
     'port'   => '8080',
 ));
@@ -15,7 +15,7 @@ $emitterKey = 'vsqk2rExvRg8qra4LoQLcbx1enNUapz8';
     try{
 RETRY:
 
-        $emitter->publish(
+        $ret = $emitter->publish(
             array(
                 'key'     => $emitterKey,
                 'channel' => $emitterChannel,
@@ -26,6 +26,8 @@ RETRY:
                 ),
             )
         );
+
+        var_dump($ret);
     }
     catch(\Exception|\Error $e)
     {

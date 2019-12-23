@@ -16,10 +16,19 @@ include '../vendor/autoload.php';
 $private_key = 'jt6k2rExvRg8qra4XoQLTrreI8pUapz8';
 $channel = 'devices2/#/';
 
-$ret = \emitter\emitter::getChannelKeyFromJson($private_key, $channel);
+$emitter = new \emitter\Emitter(array(
+    'server' => '127.0.0.1',
+    'port'   => '8080',
+));
 
-var_dump($ret);
 
-$ret2 =\emitter\emitter::getChannelKeyFromHtml($private_key, $channel);
+//$ret = \emitter\emitter::getChannelKeyFromJson($private_key, $channel);
+//
+//var_dump($ret);
+//
+//$ret2 =\emitter\emitter::getChannelKeyFromHtml($private_key, $channel);
+//
+//var_dump($ret2);
 
-var_dump($ret2);
+$retReal = $emitter->keygen($private_key, $channel, 360, true );
+var_dump($retReal);

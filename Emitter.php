@@ -12,10 +12,11 @@ use emitter\phpMQTT;
 use qhelpers\HttpRequest;
 use qhelpers\StringUtils;
 
-class emitter
+class Emitter
 {
     protected $emitter;
     protected $prefix = '';
+    protected $_topics = [];
 
     /**
      * Emitter constructor.
@@ -127,9 +128,14 @@ class emitter
             (substr($haystack, -$length) === $needle);
     }
 
-    public function reconnect()
+    public function reconnect($auto_subscrbe = true)
     {
         $this->emitter->connect();
+
+        if( $auto_subscrbe )
+        {
+            $this->emitter->subscribe($this->_topics);
+        }
     }
 
     public function disconnect()
@@ -156,12 +162,17 @@ class emitter
             $message = json_encode($message);
         }
 
-        $this->emitter->publish($key . $channel, $message, 0);
+        return $this->emitter->publish($key . $channel, $message, 0);
     }
 
 
     public function subscribe($topics, $qos = 0)
     {
+        foreach( $topics as $key => $val )
+        {
+            $this->_topics[$key] = $val;
+        }
+
         return $this->emitter->subscribe($topics, $qos);
     }
 
@@ -172,6 +183,63 @@ class emitter
     public function proc($loop = true)
     {
         $this->emitter->proc($loop);
+    }
+
+    /**
+     * params = $type
+     */
+    public function keygen($private_key,
+                           $channel,
+                           $ttl = 0,
+                           $sub = true,
+                           $pub = true,
+                           $store = true,
+                           $load = true,
+                           $presence = true )
+    {
+        $messages = ['key' => $private_key, 'channel' => $channel, 'type' => '', 'ttl' => $ttl];
+
+        $fields = ['sub' => 'r', 'pub' => 'w', 'store' => 's', 'load' => 'l', 'presence' => 'p'];
+        $type = '';
+        foreach( $fields as $param => $v )
+        {
+            $type .= ( ${$param} != false ) ? $v : '';
+        }
+
+        $messages['type'] = $type;
+        $keygen_channel = 'emitter/keygen/';
+
+        if (is_array($messages) || is_object($messages))
+        {
+            $messages = json_encode($messages);
+        }
+
+        //////////////////////////////
+        $retReal = ['topic' => '', 'message'  => '' ];
+        $found = false;
+        $topics = [ $keygen_channel =>
+            [
+                'qos' => 0,
+                'channel' => $keygen_channel,
+                'function' => function($topic, $message) use(&$found, &$retReal){
+
+                    echo 'received message: ', $topic, ' ', $message, PHP_EOL;
+
+                    $retReal['topic'] = $topic;
+                    $retReal['message'] = $message;
+
+                    $found = true;
+                }]];
+
+        $this->emitter->subscribe( $topics );
+        $this->emitter->publish($keygen_channel, $messages, 0);
+
+        while( !$found )
+        {
+            $this->emitter->proc();
+        }
+
+        return json_decode($retReal['message'], true)['key'];
     }
 
     /**
