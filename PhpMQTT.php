@@ -3,7 +3,7 @@
 namespace emitter;
 
 /*
- 	phpMQTT
+ 	PhpMQTT
 	A simple php class to connect/publish/subscribe to an MQTT broker
 
 */
@@ -34,8 +34,8 @@ namespace emitter;
 
 */
 
-/* phpMQTT */
-class phpMQTT
+/* PhpMQTT */
+class PhpMQTT
 {
 
     private $socket;            /* holds the socket	*/
@@ -195,10 +195,15 @@ class phpMQTT
 
         $string = $this->read(4);
 
-        if(ord($string{0}) >> 4 == 2 && $string{3} == chr(0)) {
+        if(ord($string{0}) >> 4 == 2 && $string{3} == chr(0))
+        {
             if($this->debug)
+            {
                 echo "Connected to Broker\n";
-        } else {
+            }
+        }
+        else
+        {
             error_log(sprintf("Connection failed! (Error: 0x%02x 0x%02x)\n",
                 ord($string{0}), ord($string{3})));
             return false;
@@ -223,12 +228,14 @@ class phpMQTT
         $string = "";
         $togo = $int;
 
-        if($nb) {
+        if($nb)
+        {
             return fread($this->socket, $togo);
         }
 
 
-        while (!feof($this->socket) && $togo > 0) {
+        while (!feof($this->socket) && $togo > 0)
+        {
             $fread = fread($this->socket, $togo);
             $string .= $fread;
             $togo = $int - strlen($string);
@@ -254,6 +261,7 @@ class phpMQTT
         $i++;
         $buffer .= chr($id % 256);
         $i++;
+
 
         if( $this->_subscribe_cnt >= 2 )
         {
@@ -296,6 +304,64 @@ class phpMQTT
         $this->readStoredMessage();
     }
 
+    static public function PackStringWithLength($str)
+    {
+        $len = strlen($str);
+
+        return pack('n', $len) . $str;
+    }
+
+    public function unsubscribe($topics)
+    {
+        $unsubscribe_cmd = 0x0A << 4;
+        $payload = '';
+
+        # Payload
+        foreach ($topics as $key => $topic)
+        {
+            $payload .= self::PackStringWithLength($key);
+
+            $topic_key = $this->assembleKey($topic, !($this->_subscribe_cnt > 1));
+
+            unset( $this->topics[$topic_key] );
+
+        }
+
+        $payload_length = strlen($payload);
+        $remaining_length_bytes = $this->getRemainingBytes($payload_length);
+        $header = chr($unsubscribe_cmd) . $remaining_length_bytes;
+
+        $msg = $header. $payload;
+
+        $length = $this->getFullLength($remaining_length_bytes, $payload_length);
+        $write_length = fwrite($this->socket, $msg, $length);
+
+        return $length == $write_length;
+    }
+
+    private function getFullLength($remaining_length_bytes, $remaining_length)
+    {
+        $cmd_length = 1;
+
+        $rl_length = strlen($remaining_length_bytes);
+
+        return $cmd_length + $rl_length + $remaining_length;
+    }
+
+
+    private function getRemainingBytes($length)
+    {
+        $string = "";
+        do{
+            $digit = $length % 0x80;
+            $length = $length >> 7;
+            // if there are more digits to encode, set the top bit of this digit
+            if ( $length > 0 ) $digit = ($digit | 0x80);
+            $string .= chr($digit);
+        } while ( $length > 0 );
+
+        return $string;
+    }
 
     private function assembleKey($topic_info, $retrieve_stored_message = false)
     {
@@ -334,7 +400,10 @@ class phpMQTT
         $head .= chr(0x00);
         fwrite($this->socket, $head, 2);
         if($this->debug)
+        {
             echo "ping sent\n";
+        }
+
     }
 
     /* disconnect: sends a proper disconect cmd */
@@ -358,7 +427,6 @@ class phpMQTT
     {
         $i = 0;
         $buffer = "";
-
 
         $buffer .= $this->strwritestring($topic, $i);
 
@@ -613,7 +681,8 @@ class phpMQTT
 
     private function readStoredMessage(): void
     {
-        while (!feof($this->socket)) {
+        while (!feof($this->socket))
+        {
             $string = $this->read(2);
 
             $bytes = ord(substr($string, 1, 1));
@@ -623,15 +692,19 @@ class phpMQTT
 
             $topic_key = $this->getMessageTopicInfo($strMessage);
 
-            if($topic_key) {
+            if($topic_key)
+            {
                 $topic_info = $this->topics[$topic_key];
 
                 call_user_func($topic_info['function'], $topic_info['channel'], substr($strMessage, strlen($topic_info['channel']) + 3));
 
-                if(++$this->topics[$topic_key]['cnt'] >= $this->topics[$topic_key]['last']) {
+                if(++$this->topics[$topic_key]['cnt'] >= $this->topics[$topic_key]['last'])
+                {
                     return;
                 }
-            } else {
+            }
+            else
+            {
                 return;
             }
 

@@ -14,7 +14,6 @@ $emitterKey = 'vsqk2rExvRg8qra4LoQLcbx1enNUapz8';
     $time = time();
     try{
 RETRY:
-
         $ret = $emitter->publish(
             array(
                 'key'     => $emitterKey,

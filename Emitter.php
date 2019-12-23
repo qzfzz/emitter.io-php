@@ -8,15 +8,15 @@
 
 namespace emitter;
 
-use emitter\phpMQTT;
+
 use qhelpers\HttpRequest;
 use qhelpers\StringUtils;
 
 class Emitter
 {
-    protected $emitter;
+    protected $phpMQTT;
     protected $prefix = '';
-    protected $_topics = [];
+    protected $topics = [];
 
     /**
      * Emitter constructor.
@@ -33,8 +33,8 @@ class Emitter
 
         $username = '';
         $password = '';
-        $this->emitter = new phpMQTT($server, $port, $uniqueId);
-        if (! $this->emitter->connect(true, NULL, $username, $password)) {
+        $this->phpMQTT = new PhpMQTT($server, $port, $uniqueId);
+        if (! $this->phpMQTT->connect(true, NULL, $username, $password)) {
             return false;
         }
 
@@ -130,17 +130,17 @@ class Emitter
 
     public function reconnect($auto_subscrbe = true)
     {
-        $this->emitter->connect();
+        $this->phpMQTT->connect();
 
         if( $auto_subscrbe )
         {
-            $this->emitter->subscribe($this->_topics);
+            $this->phpMQTT->subscribe($this->topics);
         }
     }
 
     public function disconnect()
     {
-        $this->emitter->close();
+        $this->phpMQTT->close();
     }
 
 
@@ -162,7 +162,7 @@ class Emitter
             $message = json_encode($message);
         }
 
-        return $this->emitter->publish($key . $channel, $message, 0);
+        return $this->phpMQTT->publish($key . $channel, $message, 0);
     }
 
 
@@ -170,11 +170,20 @@ class Emitter
     {
         foreach( $topics as $key => $val )
         {
-            $this->_topics[$key] = $val;
+            $this->topics[$key] = $val;
         }
 
-        return $this->emitter->subscribe($topics, $qos);
+        return $this->phpMQTT->subscribe($topics, $qos);
     }
+
+
+    public function unsubscribe($topics)
+    {
+        $this->phpMQTT->unsubscribe($topics);
+    }
+
+
+
 
     /**
      * do process
@@ -182,7 +191,7 @@ class Emitter
      */
     public function proc($loop = true)
     {
-        $this->emitter->proc($loop);
+        $this->phpMQTT->proc($loop);
     }
 
     /**
@@ -231,12 +240,12 @@ class Emitter
                     $found = true;
                 }]];
 
-        $this->emitter->subscribe( $topics );
-        $this->emitter->publish($keygen_channel, $messages, 0);
+        $this->phpMQTT->subscribe( $topics );
+        $this->phpMQTT->publish($keygen_channel, $messages, 0);
 
         while( !$found )
         {
-            $this->emitter->proc();
+            $this->phpMQTT->proc();
         }
 
         return json_decode($retReal['message'], true)['key'];

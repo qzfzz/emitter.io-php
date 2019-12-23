@@ -24,12 +24,40 @@ $topics = [ $emitterChannel =>
 }]];
 
 $emitter->subscribe( $topics );
+$cnt = 0;
 
-\Workerman\Lib\Timer::add(0.01, function()use(&$emitter){
+\Workerman\Lib\Timer::add(0.01, function()use(&$emitter, &$cnt, $emitterKey, $emitterChannel){
     try
     {
         RETRY:
         $emitter->proc();
+
+        if( $cnt++ == 3 )
+        {
+            $emitter->unsubscribe([ $emitterChannel =>
+                [
+                    'key' => $emitterKey,
+                    'qos' => 0,
+                    'channel' => $emitterChannel,
+                    'from' => 1576822781,
+                    'until' => 1576822787,
+                    'last' => 10,
+                  ]]);
+        }
+        elseif( $cnt++ == 7 )
+        {
+            $emitter->subscribe([ $emitterChannel =>
+                [
+                    'key' => $emitterKey,
+                    'qos' => 0,
+                    'channel' => $emitterChannel,
+                    'from' => 1576822781,
+                    'until' => 1576822787,
+                    'last' => 10,'function' => function($topic, $message){
+                    echo 'received message: ', $topic, ' ', $message, PHP_EOL;
+                },
+                ]]);
+        }
     }
     catch(\Exception|\Error $e)
     {
