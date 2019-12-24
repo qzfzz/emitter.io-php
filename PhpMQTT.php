@@ -35,6 +35,8 @@ namespace emitter;
 */
 
 /* PhpMQTT */
+use qhelpers\Benchmark;
+
 class PhpMQTT
 {
 
@@ -263,9 +265,9 @@ class PhpMQTT
         $i++;
 
 
-        if( $this->_subscribe_cnt >= 2 )
+        if( $this->_subscribe_cnt > 1 )
         {
-            echo 'subscribe cnt: ', PHP_EOL;
+            echo 'subscribe cnt: ', $this->_subscribe_cnt, PHP_EOL;
         }
 
         foreach($topics as $channel => &$topic) {
@@ -518,6 +520,7 @@ class PhpMQTT
         set true when you are doing other stuff in the loop good for watching something else at the same time */
     public function proc($loop = true)
     {
+
         //$byte = fgetc($this->socket);
         if(feof($this->socket))
         {
@@ -535,14 +538,13 @@ class PhpMQTT
             }
 
         }
-
         $byte = $this->read(1, true);
 
         if(!strlen($byte))
         {
             if($loop)
             {
-                usleep(10000);
+                usleep(100);
             }
 
         }
@@ -617,7 +619,6 @@ class PhpMQTT
             }
 
         }
-
 
         return 1;
     }

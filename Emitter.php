@@ -18,6 +18,8 @@ class Emitter
     protected $prefix = '';
     protected $topics = [];
 
+    protected $is_subscribed = false;
+
     /**
      * Emitter constructor.
      * @param array $config
@@ -128,11 +130,11 @@ class Emitter
             (substr($haystack, -$length) === $needle);
     }
 
-    public function reconnect($auto_subscrbe = true)
+    public function reconnect($auto_subscribe = true)
     {
         $this->phpMQTT->connect();
 
-        if( $auto_subscrbe )
+        if( $this->is_subscribed && $auto_subscribe )
         {
             $this->phpMQTT->subscribe($this->topics);
         }
@@ -166,8 +168,16 @@ class Emitter
     }
 
 
+    /**
+     * @deprecated
+     * @bugs inside please do not use it before fixed
+     * @param $topics
+     * @param int $qos
+     */
     public function subscribe($topics, $qos = 0)
     {
+        $this->is_subscribed = true;
+
         foreach( $topics as $key => $val )
         {
             $this->topics[$key] = $val;
@@ -189,7 +199,7 @@ class Emitter
      * do process
      * @param bool $loop
      */
-    public function proc($loop = true)
+    public function proc($loop = false)
     {
         $this->phpMQTT->proc($loop);
     }
